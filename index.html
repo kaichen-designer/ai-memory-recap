@@ -118,7 +118,23 @@ function parseExport(text,ev){
   });
   return n;
 }
-function family(m){m=m.toLowerCase();return m.indexOf('opus')>=0?'Opus':m.indexOf('sonnet')>=0?'Sonnet':m.indexOf('haiku')>=0?'Haiku':m.indexOf('fable')>=0?'Fable':m.indexOf('gpt')>=0?'GPT':m==='?'?'未知':m}
+function gemId(r){var d=r.details;if(Array.isArray(d))for(var i=0;i<d.length;i++){var m=/gemini\.google\.com\/app\/([0-9a-f]+)/.exec(d[i]&&d[i].url||'');if(m)return m[1]}return ''}
+function parseGemini(text,ev){
+  var data;try{data=JSON.parse(text)}catch(e){return 0}
+  if(!Array.isArray(data)||!data.some(function(r){return r&&/gemini/i.test(r.header||'')}))return 0;
+  var byId={},order=[],n=0;
+  data.forEach(function(r,i){
+    if(!r||typeof r.title!=='string'||!/^Prompted\s/.test(r.title))return;
+    var t=new Date(r.time);if(isNaN(t))return;
+    var tx=clean(r.title.replace(/^Prompted\s+/,'')),id=gemId(r)||('_'+i);
+    var f=byId[id];if(!f){f=byId[id]=newFile('','Gemini');f.chat='Gemini 對話';order.push(id)}
+    f.stamps.push(+t);if(tx)f.prompts.push({t:t,text:tx});
+    if(Array.isArray(r.safeHtmlItem)&&r.safeHtmlItem.length)ev.replies.push({t:t,out:0,model:'Gemini',proj:''});
+  });
+  order.forEach(function(id){var f=byId[id];f.prompts.sort(function(a,b){return a.t-b.t});endFile(f,ev);n++});
+  return n;
+}
+function family(m){m=m.toLowerCase();return m.indexOf('gemini')>=0?'Gemini':m.indexOf('opus')>=0?'Opus':m.indexOf('sonnet')>=0?'Sonnet':m.indexOf('haiku')>=0?'Haiku':m.indexOf('fable')>=0?'Fable':m.indexOf('gpt')>=0?'GPT':m==='?'?'未知':m}
 function summarize(ev,source){
   var P=[];ev.sessions.forEach(function(s){s.prompts.forEach(function(p){P.push({t:p.t,text:p.text,s:s})})});
   P.sort(function(a,b){return a.t-b.t});var R=ev.replies;
@@ -234,24 +250,26 @@ function pathOf(f){return f.__path||f.webkitRelativePath||f.name}
 var G=newEv(),GSEEN={},dropMode=false;
 function resetG(){G=newEv();GSEEN={}}
 function addFiles(files,say){
-  var cc=[],ex=[],skipped=0,dup=0;
+  var cc=[],ex=[],gm=[],skipped=0,dup=0,bad=0;
   files.forEach(function(f){var n=f.name,pth=pathOf(f),key=pth+'|'+f.size;
-    var isEx=n==='conversations.json',isCc=/\.jsonl$/.test(n)&&n!=='history.jsonl'&&/projects/.test(pth.replace(/\\/g,'/'));
-    if(!isEx&&!isCc){skipped++;return}
+    var isEx=n==='conversations.json',isGm=!isEx&&/\.json$/i.test(n)&&(!/[\\/]/.test(pth)||/gemini/i.test(pth)),
+      isCc=/\.jsonl$/.test(n)&&n!=='history.jsonl'&&/projects/.test(pth.replace(/\\/g,'/'));
+    if(!isEx&&!isGm&&!isCc){skipped++;return}
     if(GSEEN[key]){dup++;return}
-    GSEEN[key]=1;(isEx?ex:cc).push(f)});
+    GSEEN[key]=1;(isEx?ex:isGm?gm:cc).push(f)});
   var done=0,chain=Promise.resolve();
   cc.forEach(function(f){chain=chain.then(function(){
     var parts=pathOf(f).replace(/\\/g,'/').split('/'),ix=parts.indexOf('projects'),proj=ix>=0&&parts[ix+1]?parts[ix+1]:parts[Math.max(0,parts.length-2)];
     var fl=newFile(proj,'Claude Code');
     return eachLine(f,function(line){ccLine(line,fl,G)}).then(function(){endFile(fl,G);done++;if(done%10===0)say('已讀取 '+done+' / '+cc.length+' 個檔案…')})})});
-  ex.forEach(function(f){chain=chain.then(function(){return f.text().then(function(t){say('解析匯出檔…');parseExport(t,G)})})});
-  return chain.then(function(){return {added:cc.length+ex.length,skipped:skipped,dup:dup}});
+  ex.forEach(function(f){chain=chain.then(function(){return f.text().then(function(t){say('解析匯出檔…');try{if(!parseExport(t,G))bad++}catch(e){bad++}})})});
+  gm.forEach(function(f){chain=chain.then(function(){return f.text().then(function(t){say('解析 Gemini 活動記錄…');if(!parseGemini(t,G))bad++})})});
+  return chain.then(function(){return {added:cc.length+ex.length+gm.length-bad,skipped:skipped,dup:dup,bad:bad}});
 }
 function toolCounts(){var o={};G.sessions.forEach(function(s){o[s.tool]=(o[s.tool]||0)+1});return o}
 function finish(say){
   var n=Object.keys(toolCounts()).length,s=summarize(G,n>1?'mixed':'single');
-  if(!s){say('還沒有可用的紀錄。請確認選的是 Claude Code 的 projects 資料夾，或匯出檔裡的 conversations.json。');return null}
+  if(!s){say('還沒有可用的紀錄。請確認選的是 Claude Code 的 projects 資料夾、匯出檔裡的 conversations.json，或 Gemini 的 JSON 活動記錄。');return null}
   show(s);return s;
 }
 function handleFiles(files,say){return addFiles(files,say).then(function(){return finish(say)})}
@@ -267,7 +285,7 @@ function walk(entry,path,out){return new Promise(function(res){
 
 function dropUI(){
   dropMode=true;
-  $('card').innerHTML='<div class="top"><span>AI 回憶錄</span><span>全部在這個頁面內計算</span></div><div class="slide"><p class="eyebrow">第一步</p><p class="title">把你的 AI 紀錄放進來</p><div class="drop" id="dz"><p style="margin:0">把資料夾或檔案拖到這裡，可以分次加入多個 AI</p><div class="btns"><label class="btn">選擇 Claude Code 紀錄資料夾<input type="file" id="pf" webkitdirectory></label><label class="btn">選擇匯出檔 conversations.json<input type="file" id="pj" accept=".json"></label></div></div><div id="added" style="margin-top:16px"></div><div id="status"></div><div class="btns" id="acts" style="justify-content:flex-start;display:none"><button id="go">產生我的回憶錄</button><button id="clr">清除重來</button></div><p class="note">Claude Code 的資料夾：Windows 是 %USERPROFILE%\\.claude\\projects，Mac 與 Linux 是 ~/.claude/projects。ChatGPT、Claude.ai 請先在設定裡匯出資料（會寄到信箱，需要等一段時間），解壓縮後選 conversations.json。</p><p class="note">這個頁面已設定為禁止任何網路連線，你的紀錄不會被上傳，只會讀取 .jsonl 與 conversations.json 兩種檔案。</p></div>';
+  $('card').innerHTML='<div class="top"><span>AI 回憶錄</span><span>全部在這個頁面內計算</span></div><div class="slide"><p class="eyebrow">第一步</p><p class="title">把你的 AI 紀錄放進來</p><div class="drop" id="dz"><p style="margin:0">把資料夾或檔案拖到這裡，可以分次加入多個 AI</p><div class="btns"><label class="btn">選擇 Claude Code 紀錄資料夾<input type="file" id="pf" webkitdirectory></label><label class="btn">選擇匯出檔（.json）<input type="file" id="pj" accept=".json"></label></div></div><div id="added" style="margin-top:16px"></div><div id="status"></div><div class="btns" id="acts" style="justify-content:flex-start;display:none"><button id="go">產生我的回憶錄</button><button id="clr">清除重來</button></div><p class="note">Claude Code 的資料夾：Windows 是 %USERPROFILE%\\.claude\\projects，Mac 與 Linux 是 ~/.claude/projects。ChatGPT、Claude.ai 請先在設定裡匯出資料（會寄到信箱，需要等一段時間），解壓縮後選 conversations.json。Gemini 請到 Google Takeout 只勾「我的活動」，並把格式改成 JSON，解壓縮後選 Gemini Apps 資料夾裡的 .json 檔。</p><p class="note">這個頁面已設定為禁止任何網路連線，你的紀錄不會被上傳，只會讀取 .jsonl、conversations.json，以及你選取的 .json 活動記錄。</p></div>';
   var say=function(m){$('status').textContent=m},dz=$('dz');
   function list(){
     var tc=toolCounts(),ks=Object.keys(tc);
@@ -276,7 +294,7 @@ function dropUI(){
   }
   function run(fs){say('讀取中…');addFiles(fs,say).then(function(r){
     list();
-    say(r.added?'已加入 '+r.added+' 個檔案'+(r.dup?'（略過 '+r.dup+' 個重複）':'')+'。還有其他 AI 的紀錄嗎？可以繼續加入，或直接產生。':'沒有找到可用的紀錄。請確認選的是 Claude Code 的 projects 資料夾，或匯出檔裡的 conversations.json。'+(r.dup?'（'+r.dup+' 個是重複的檔案）':''))
+    say(r.added?'已加入 '+r.added+' 個檔案'+(r.dup?'（略過 '+r.dup+' 個重複）':'')+'。還有其他 AI 的紀錄嗎？可以繼續加入，或直接產生。'+(r.bad?'（有 '+r.bad+' 個檔案的格式讀不了）':''):'沒有找到可用的紀錄。請確認選的是 Claude Code 的 projects 資料夾、匯出檔裡的 conversations.json，或 Gemini 的 JSON 活動記錄。'+(r.bad?'（有 '+r.bad+' 個檔案的格式讀不了）':'')+(r.dup?'（'+r.dup+' 個是重複的檔案）':''))
   }).catch(function(e){say('讀取失敗：'+e.message)})}
   $('pf').onchange=function(e){run([].slice.call(e.target.files));e.target.value=''};
   $('pj').onchange=function(e){run([].slice.call(e.target.files));e.target.value=''};
