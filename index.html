@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>AI 回憶錄</title>
+<style>
+:root{--bg:#e9e6df;--card:#fff;--text:#1f1e1b;--sub:#6b6a64;--line:#e3e0d8;--chip:#f4f2ee;--accent:#7F77DD;--bar:#b4b2a9}
+@media (prefers-color-scheme:dark){:root{--bg:#0f0f0e;--card:#222220;--text:#f1efe8;--sub:#a3a199;--line:#3a3935;--chip:#2c2b28;--bar:#6b6a64}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--text);font:16px/1.7 system-ui,-apple-system,"Segoe UI","Microsoft JhengHei","PingFang TC",sans-serif}
+.card{width:min(680px,94vw);background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;animation:pop .5s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes pop{from{opacity:0;transform:translateY(28px) scale(.93)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.card,.slide{animation:none!important}}
+.top{display:flex;justify-content:space-between;align-items:center;padding:12px 28px;border-bottom:1px solid var(--line);font-size:13px;color:var(--sub)}
+.slide{padding:28px 32px;min-height:410px;animation:fade .35s ease both}
+.eyebrow{font-size:13px;color:var(--sub);margin:0 0 8px}
+.title{font-size:22px;font-weight:500;line-height:1.4;margin:0 0 14px}
+.q{font-family:"Noto Serif TC","Songti TC",Georgia,serif;font-size:19px;line-height:1.7;margin:0;padding:6px 0 6px 16px;border-left:2px solid var(--sub);transition:filter .2s}
+.masked .q,.masked .ev span{filter:blur(7px);user-select:none}
+.note{font-size:14px;color:var(--sub);margin:12px 0 0;line-height:1.7}
+.lead{font-size:16px;color:var(--text);margin-top:22px}
+.tl{margin:6px 0 0;padding-left:22px;border-left:1px solid var(--sub)}
+.ev{position:relative;margin:0 0 16px}
+.ev:before{content:"";position:absolute;left:-27px;top:8px;width:9px;height:9px;border-radius:50%;background:var(--text)}
+.ev small{display:block;font-size:12px;color:var(--sub)}
+.ev span{font-family:"Noto Serif TC","Songti TC",Georgia,serif;font-size:16px;line-height:1.6;transition:filter .2s}
+.chips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:4px 0 18px}
+.chip{background:var(--chip);border-radius:8px;padding:12px 14px;text-align:center}
+.chip b{display:block;font-size:24px;font-weight:500}
+.chip span{font-size:13px;color:var(--sub)}
+.bars{display:flex;align-items:flex-end;gap:3px;height:92px}
+.bars i{flex:1;border-radius:2px 2px 0 0;background:var(--bar)}
+.axis{display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin:4px 0 16px}
+.row{display:flex;align-items:center;gap:10px;font-size:14px;margin:9px 0}
+.sw{width:10px;height:10px;border-radius:2px;flex:none}
+.stack{display:flex;height:28px;border-radius:8px;overflow:hidden;gap:2px}
+.mbars{display:flex;align-items:flex-end;gap:14px;height:132px;margin:4px 0 6px}
+.mbars div{flex:1;text-align:center;font-size:12px;color:var(--sub)}
+.mbars div i{display:block;background:var(--bar);border-radius:4px 4px 0 0;margin-bottom:2px}
+.fact{padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.end{font-family:"Noto Serif TC","Songti TC",Georgia,serif;font-size:16px;line-height:1.9;margin:0}
+.cover{display:flex;flex-direction:column;justify-content:center;min-height:410px}
+.cover .big{font-size:34px;font-weight:500;line-height:1.3;margin:0 0 10px}
+.foot{display:flex;align-items:center;justify-content:space-between;padding:10px 28px;border-top:1px solid var(--line)}
+button,.btn{font:inherit;font-size:14px;background:transparent;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 14px;cursor:pointer}
+button:hover,.btn:hover{background:var(--chip)}
+.dots{display:flex;gap:6px}.dots span{width:8px;height:8px;border-radius:50%;background:var(--line)}.dots .on{background:var(--text)}
+.drop{margin:8px 0 0;border:1.5px dashed var(--sub);border-radius:12px;padding:34px 20px;text-align:center}
+.drop.hot{background:var(--chip)}
+.btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+#status{font-size:13px;color:var(--sub);margin-top:14px;min-height:20px}
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+<main class="card" id="card"></main>
+<script id="data" type="application/json">__SUMMARY_JSON__</script>
+<script>
+(function(){
+'use strict';
+/*PURE-START*/
+var SECRETS=[[/sk-[A-Za-z0-9_\-]{16,}/g,'[key]'],[/bearer\s+[A-Za-z0-9._\-]{16,}/gi,'[token]'],[/AKIA[0-9A-Z]{16}/g,'[key]'],[/[\w.+-]+@[\w-]+\.[\w.-]+/g,'[email]'],[/(api[_-]?key|token|secret|password)\s*[=:]\s*\S+/gi,'$1=[hidden]'],[/\b[A-Za-z0-9+\/_\-]{32,}\b/g,'[hidden]'],[/([A-Za-z]:\\Users\\)[^\\\s]+/g,'$1user']];
+var NOISE=['Caveat','[Request interrupted','Base directory','This session is being continued','Background (from','Task (from'];
+function redact(s){SECRETS.forEach(function(r){s=s.replace(r[0],r[1])});return s}
+function clean(t){return t.replace(/<([a-zA-Z_-]+)[^>]*>[\s\S]*?<\/\1>/g,' ').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}
+function textOf(m){var c=m.content;if(typeof c==='string')return c;if(Array.isArray(c))return c.map(function(b){return b&&b.type==='text'?(b.text||''):''}).join(' ');return ''}
+function pad(n){return (n<10?'0':'')+n}
+function dkey(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function iso(d){return dkey(d)+'T'+pad(d.getHours())+':'+pad(d.getMinutes())}
+function eligible(t){return t.length>=6&&t[0]!=='/'&&t[0]!=='@'}
+function quote(t){t=redact(t);return t.length>70?t.slice(0,70)+'…':t}
+function projName(d){d=d.replace(/^[A-Za-z]--/,'');return /^-*$/.test(d)?'（其他專案）':d}
+function newEv(){return {sessions:[],replies:[],seen:{},names:{}}}
+function newFile(proj,tool){return {proj:proj,tool:tool||'',prompts:[],stamps:[]}}
+function segs(st){var o=[],s=st[0],e=st[0];for(var i=1;i<st.length;i++){if(st[i]-e<1800000)e=st[i];else{o.push([s,e]);s=e=st[i]}}o.push([s,e]);return o}
+function union(list){list=list.slice().sort(function(a,b){return a[0]-b[0]});var tot=0,cs=null,ce=null;list.forEach(function(g){if(cs===null){cs=g[0];ce=g[1]}else if(g[0]<=ce){if(g[1]>ce)ce=g[1]}else{tot+=ce-cs;cs=g[0];ce=g[1]}});if(cs!==null)tot+=ce-cs;return tot}
+function ccLine(line,f,ev){
+  var d;try{d=JSON.parse(line)}catch(e){return}
+  if(!d||!d.timestamp)return;var t=new Date(d.timestamp);if(isNaN(t))return;
+  f.stamps.push(+t);
+  if(d.cwd&&!f.cwd)f.cwd=d.cwd;
+  if(d.type==='user'&&!d.isMeta&&!d.isSidechain){
+    var m=d.message;if(m&&typeof m==='object'){var x=clean(textOf(m));
+      if(x&&!NOISE.some(function(p){return x.indexOf(p)===0}))f.prompts.push({t:t,text:x})}
+  }else if(d.type==='assistant'){
+    var m2=d.message,u=m2&&m2.usage;if(!u)return;
+    if(m2.id||d.requestId){var k=(m2.id||'')+'|'+(d.requestId||'');if(ev.seen[k])return;ev.seen[k]=1}
+    if(m2.model==='<synthetic>')return;
+    ev.replies.push({t:t,out:u.output_tokens||0,model:m2.model||'?',proj:f.proj});
+  }
+}
+function endFile(f,ev){
+  if(f.cwd&&f.proj&&!ev.names[f.proj])ev.names[f.proj]=f.cwd.replace(/[\\/]+$/,'').split(/[\\/]/).pop();
+  if(!f.prompts.length)return;
+  f.stamps.sort(function(a,b){return a-b});f.segs=segs(f.stamps);
+  f.active=f.segs.reduce(function(x,g){return x+g[1]-g[0]},0);ev.sessions.push(f);
+}
+function parseExport(text,ev){
+  var data=JSON.parse(text);if(!Array.isArray(data))return 0;var n=0;
+  data.forEach(function(c,ci){
+    var f=newFile('',c.mapping?'ChatGPT':'Claude.ai');f.chat=c.title||c.name||'';
+    if(c.mapping){
+      Object.keys(c.mapping).forEach(function(k){var m=c.mapping[k].message;if(!m||!m.create_time)return;
+        var t=new Date(m.create_time*1000),role=m.author&&m.author.role;f.stamps.push(+t);
+        var parts=m.content&&m.content.parts;var tx=Array.isArray(parts)?parts.filter(function(p){return typeof p==='string'}).join(' '):'';
+        if(role==='user'){tx=clean(tx);if(tx)f.prompts.push({t:t,text:tx})}
+        else if(role==='assistant'&&tx){ev.replies.push({t:t,out:0,model:(m.metadata&&m.metadata.model_slug)||'?',proj:''})}});
+    }else if(Array.isArray(c.chat_messages)){
+      c.chat_messages.forEach(function(m){if(!m.created_at)return;var t=new Date(m.created_at);f.stamps.push(+t);
+        var tx=clean(m.text||'');
+        if(m.sender==='human'){if(tx)f.prompts.push({t:t,text:tx})}
+        else if(tx){ev.replies.push({t:t,out:0,model:'?',proj:''})}});
+    }
+    f.prompts.sort(function(a,b){return a.t-b.t});endFile(f,ev);n++;
+  });
+  return n;
+}
+function family(m){m=m.toLowerCase();return m.indexOf('opus')>=0?'Opus':m.indexOf('sonnet')>=0?'Sonnet':m.indexOf('haiku')>=0?'Haiku':m.indexOf('fable')>=0?'Fable':m.indexOf('gpt')>=0?'GPT':m==='?'?'未知':m}
+function summarize(ev,source){
+  var P=[];ev.sessions.forEach(function(s){s.prompts.forEach(function(p){P.push({t:p.t,text:p.text,s:s})})});
+  P.sort(function(a,b){return a.t-b.t});var R=ev.replies;
+  if(!P.length&&!R.length)return null;
+  var days={},hours=[];for(var h=0;h<24;h++)hours.push(0);
+  P.forEach(function(p){days[dkey(p.t)]=1;hours[p.t.getHours()]++});
+  R.forEach(function(r){days[dkey(r.t)]=1});
+  var keys=Object.keys(days).sort(),best=1,cur=1,bs=keys[0],be=keys[0],cs=keys[0];
+  for(var i=1;i<keys.length;i++){var gap=Math.round((new Date(keys[i]+'T12:00:00')-new Date(keys[i-1]+'T12:00:00'))/864e5);
+    if(gap===1)cur++;else{cur=1;cs=keys[i]}if(cur>best){best=cur;bs=cs;be=keys[i]}}
+  var all=P.map(function(p){return p.t}).concat(R.map(function(r){return r.t})).sort(function(a,b){return a-b});
+  var E=P.filter(function(p){return eligible(p.text)});
+  var first=E.length?{t:iso(E[0].t),text:quote(E[0].text)}:null;
+  var nightP=E.filter(function(p){return p.t.getHours()<6}),night=null;
+  if(nightP.length){var bn=nightP[0];nightP.forEach(function(p){if(p.t.getHours()*60+p.t.getMinutes()>=bn.t.getHours()*60+bn.t.getMinutes())bn=p});
+    var dk=dkey(bn.t),cnt=P.filter(function(p){return dkey(p.t)===dk&&p.t.getHours()<2}).length;
+    night={t:iso(bn.t),text:quote(bn.text),n:cnt}}
+  var nm=function(d){return ev.names[d]||projName(d)};
+  var ss=ev.sessions.slice().sort(function(a,b){return b.prompts.length-a.prompts.length||b.active-a.active}),longest=null;
+  if(ss.length){var L=ss[0],le=L.prompts.filter(function(p){return eligible(p.text)}),qs=[];
+    if(le.length){qs.push(le[0]);
+      var ln=le.filter(function(p){return p.t.getHours()<5}),pick=null;
+      if(ln.length){pick=ln[0];ln.forEach(function(p){if(p.t.getHours()*60+p.t.getMinutes()>=pick.t.getHours()*60+pick.t.getMinutes())pick=p})}else pick=le[Math.floor(le.length/2)];
+      if(qs.indexOf(pick)<0)qs.push(pick);
+      var lastq=null;for(var j=le.length-1;j>=0;j--){if(le[j].text.length>=10){lastq=le[j];break}}
+      if(lastq&&qs.indexOf(lastq)<0)qs.push(lastq);
+      qs.sort(function(a,b){return a.t-b.t})}
+    var st=L.stamps[0],en=L.stamps[L.stamps.length-1];
+    longest={prompts:L.prompts.length,hours:Math.round(L.active/36e5),start:iso(new Date(st)),end:iso(new Date(en)),proj:L.proj?nm(L.proj):(L.chat||''),
+      quotes:qs.map(function(p){return {t:iso(p.t),text:quote(p.text)}})}}
+  var mm={};R.forEach(function(r){var k=r.t.getFullYear()+'-'+pad(r.t.getMonth()+1);mm[k]=(mm[k]||0)+1});
+  P.forEach(function(p){var k=p.t.getFullYear()+'-'+pad(p.t.getMonth()+1);if(!(k in mm))mm[k]=0});
+  var months=Object.keys(mm).sort().map(function(k){return {m:k,n:mm[k]}});
+  var pm={},mo={};
+  R.forEach(function(r){if(r.proj)pm[r.proj]=(pm[r.proj]||0)+1;var f=family(r.model);mo[f]=(mo[f]||0)+1});
+  function top(o,k){return Object.keys(o).map(function(n){return {name:n,n:o[n]}}).sort(function(a,b){return b.n-a.n}).slice(0,k)}
+  var allSegs=[];ev.sessions.forEach(function(s){allSegs=allSegs.concat(s.segs)});var act=union(allSegs);
+  var tm={};ev.sessions.forEach(function(s){var k=s.tool||'?',o=tm[k]=tm[k]||{name:k,segs:[],prompts:0,len:0,night:0,hrs:[]};o.segs=o.segs.concat(s.segs);
+    s.prompts.forEach(function(p){var h=p.t.getHours();o.prompts++;o.len+=p.text.length;if(h<6)o.night++;o.hrs[h]=(o.hrs[h]||0)+1})});
+  var tools=Object.keys(tm).map(function(k){var o=tm[k],pk=0,mx=-1;for(var h=0;h<24;h++){if((o.hrs[h]||0)>mx){mx=o.hrs[h]||0;pk=h}}
+    return {name:o.name,minutes:Math.round(union(o.segs)/6e4),prompts:o.prompts,avgLen:Math.round(o.len/o.prompts),nightPct:Math.round(o.night/o.prompts*100),peak:pk}}).sort(function(a,b){return b.minutes-a.minutes});
+  return {source:source,start:iso(all[0]),end:iso(all[all.length-1]),days:keys.length,streak:{n:best,start:bs,end:be},
+    prompts:P.length,replies:R.length,sessions:ev.sessions.length,hours:hours,activeMin:Math.round(act/6e4),tools:tools,first:first,night:night,longest:longest,
+    months:months,projects:top(pm,5).map(function(x){return {name:nm(x.name),n:x.n}}),models:top(mo,4)};
+}
+/*PURE-END*/
+
+var $=function(id){return document.getElementById(id)};
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function pl(h){return h<6?'凌晨':h<12?'上午':h<13?'中午':h<18?'下午':'晚上'}
+function tl(d){return pl(d.getHours())+' '+(d.getHours()%12||12)+':'+pad(d.getMinutes())}
+function md(d){return (d.getMonth()+1)+' 月 '+d.getDate()+' 日'}
+function fmt(n){return n.toLocaleString('en-US')}
+function fmtH(m){var h=m/60;return h<10?String(Math.round(h*10)/10):fmt(Math.round(h))}
+var COLORS=['#7F77DD','#1D9E75','#D85A30','#378ADD','#BA7517','#888780'];
+
+function slides(s){
+  var A=[],t0=new Date(s.start),t1=new Date(s.end),span=Math.round((new Date(t1.getFullYear(),t1.getMonth(),t1.getDate())-new Date(t0.getFullYear(),t0.getMonth(),t0.getDate()))/864e5);
+  A.push('<div class="slide cover"><p class="eyebrow">'+t0.getFullYear()+' / '+(t0.getMonth()+1)+' / '+t0.getDate()+' – '+t1.getFullYear()+' / '+(t1.getMonth()+1)+' / '+t1.getDate()+'</p><p class="big">你的 AI 回憶錄</p><p class="note" style="font-size:16px">'+(span+1)+' 天裡，有 '+s.days+' 天你和 AI 一起做事。<br>翻開看看，那些日子留下了什麼。</p></div>');
+  if(s.first){var f=new Date(s.first.t);
+    A.push('<div class="slide"><p class="eyebrow">'+md(f)+'，'+tl(f)+'</p><p class="title">一切是從這句話開始的</p><p class="q">'+esc(s.first.text)+'</p><p class="note">這是你對 AI 說的第一句話。</p><p class="note lead">到現在，已經過了 '+span+' 天。</p></div>')}
+  var pk=0;s.hours.forEach(function(c,h){if(c>s.hours[pk])pk=h});var mx=Math.max.apply(null,s.hours)||1;
+  var bars=s.hours.map(function(c,h){return '<i style="height:'+Math.max(1,Math.round(c/mx*90))+'px;'+(h<6?'background:var(--accent)':'')+'"></i>'}).join('');
+  var nh='';
+  if(s.night){var nd=new Date(s.night.t);
+    nh='<p class="q">'+esc(s.night.text)+'</p><p class="note">'+md(nd)+'，'+tl(nd)+'，是你最晚的一次。'+(s.night.n?'那一天凌晨 0 點到 2 點之間，你提問了 '+s.night.n+' 次。':'')+'</p>'}
+  else nh='<p class="note lead">你很少熬夜找 AI，作息很健康。</p>';
+  A.push('<div class="slide"><p class="eyebrow">你的時間</p><p class="title">'+pl(pk)+' '+(pk%12||12)+' 點，是你最常來找 AI 的時刻</p><div class="bars" role="img" aria-label="提問時段分布">'+bars+'</div><div class="axis"><span>0 時</span><span>6</span><span>12</span><span>18</span><span>23</span></div>'+nh+'</div>');
+  if(s.longest){var L=s.longest,a=new Date(L.start),b=new Date(L.end);
+    var ev=L.quotes.map(function(q){var d=new Date(q.t);return '<div class="ev"><small>'+(d.getMonth()+1)+' / '+d.getDate()+'　'+tl(d)+'</small><span>'+esc(q.text)+'</span></div>'}).join('');
+    A.push('<div class="slide"><p class="eyebrow">最久的一場對話 · '+md(a)+' – '+md(b)+'</p><p class="title">'+L.prompts+' 次提問，約 '+Math.max(1,L.hours)+' 個小時，這是你最長的一場對話</p><div class="tl">'+ev+'</div>'+(L.proj?'<p class="note">在「'+esc(L.proj)+'」裡。</p>':'')+'</div>')}
+  var sd=new Date(s.streak.start+'T12:00:00'),ed=new Date(s.streak.end+'T12:00:00');
+  A.push('<div class="slide"><p class="eyebrow">這段時間</p><p class="title">你一直都在，慢慢把事情做完</p><div class="chips"><div class="chip"><b>'+s.days+'</b><span>天，你都有來</span></div><div class="chip"><b>'+s.streak.n+'</b><span>天，連續不間斷</span></div><div class="chip"><b>'+fmtH(s.activeMin)+'</b><span>小時，一起工作</span></div></div>'+(s.streak.n>1?'<p class="note lead" style="margin-top:0">'+md(sd)+'到 '+md(ed)+'，你連續 '+s.streak.n+' 天都沒有停。</p>':'')+'<p class="note" style="font-size:12px">工作時間依訊息間隔推算（相隔 30 分鐘內視為同一段），同一時間在多個 AI 之間來回只算一次。</p></div>');
+  if(s.tools.length>=2){var tt=s.tools.reduce(function(x,t){return x+t.minutes},0)||1;
+    var tst=s.tools.map(function(t,i){return '<div style="width:'+(t.minutes/tt*100)+'%;background:'+COLORS[i%6]+'"></div>'}).join('');
+    var trs=s.tools.map(function(t,i){return '<div class="row" style="align-items:flex-start"><span class="sw" style="background:'+COLORS[i%6]+';margin-top:7px"></span><span style="flex:1"><b style="font-weight:500">'+esc(t.name)+'</b><br><span class="note" style="margin:0">'+fmtH(t.minutes)+' 小時 · '+fmt(t.prompts)+' 次提問 · 最常在'+pl(t.peak)+' '+(t.peak%12||12)+' 點 · 平均每次 '+t.avgLen+' 字</span></span></div>'}).join('');
+    var by=s.tools.slice().sort(function(a,b){return b.avgLen-a.avgLen}),ng=s.tools.slice().sort(function(a,b){return b.nightPct-a.nightPct}),ins='';
+    if(by[0].avgLen>by[by.length-1].avgLen)ins+='<div class="fact">在 '+esc(by[0].name)+' 你說得最多（平均 '+by[0].avgLen+' 字），在 '+esc(by[by.length-1].name)+' 最簡短（'+by[by.length-1].avgLen+' 字）。</div>';
+    if(ng[0].nightPct>0)ins+='<div class="fact">'+esc(ng[0].name)+' 是你最常熬夜的夥伴，'+ng[0].nightPct+'% 的提問發生在凌晨。</div>';
+    A.push('<div class="slide"><p class="eyebrow">你和每個 AI 的相處</p><p class="title">不同的 AI，不同的相處方式</p><div class="stack">'+tst+'</div><div style="margin-top:14px">'+trs+'</div>'+ins+'</div>')}
+  var top=s.models[0],tp=top?Math.round(top.n/s.replies*100):0;
+  A.push('<div class="slide"><p class="eyebrow">換個角度，看看數字</p><p class="title">這些回憶背後，是這樣的量</p><div class="chips"><div class="chip"><b>'+fmt(s.replies)+'</b><span>AI 回覆</span></div><div class="chip"><b>'+fmt(s.prompts)+'</b><span>你的提問</span></div><div class="chip"><b>'+fmt(s.sessions)+'</b><span>段對話</span></div></div>'+(top?'<div class="fact">'+tp+'% 的回覆來自 '+esc(top.name)+'。</div>':'')+'<div class="fact">平均每個使用日約 '+fmt(Math.round(s.replies/s.days))+' 則回覆。</div></div>');
+  var rows=s.projects.length>1?s.projects:s.models,tot=rows.reduce(function(x,r){return x+r.n},0)||1;
+  var st2=rows.map(function(r,i){return '<div style="width:'+(r.n/tot*100)+'%;background:'+COLORS[i%6]+'"></div>'}).join('');
+  var lg=rows.map(function(r,i){return '<div class="row"><span class="sw" style="background:'+COLORS[i%6]+'"></span><span style="flex:1">'+esc(r.name)+'</span><b style="font-weight:500">'+Math.round(r.n/tot*100)+'%</b></div>'}).join('');
+  A.push('<div class="slide"><p class="eyebrow">'+(s.projects.length>1?'你把時間花在哪':'你都和哪些模型合作')+'</p><p class="title">'+(s.projects.length>1?'最常出現的專案':'最常合作的模型')+'</p><div class="stack">'+st2+'</div><div style="margin-top:14px">'+lg+'</div></div>');
+  var mmx=Math.max.apply(null,s.months.map(function(m){return m.n}))||1,bm=s.months.reduce(function(x,m){return m.n>x.n?m:x},s.months[0]);
+  var mb=s.months.map(function(m){return '<div><i style="height:'+Math.max(2,Math.round(m.n/mmx*100))+'px;'+(m===bm?'background:var(--accent)':'')+'"></i>'+parseInt(m.m.slice(5),10)+' 月</div>'}).join('');
+  A.push('<div class="slide"><p class="eyebrow">每月的回覆數</p><div class="mbars">'+mb+'</div><div class="fact">'+parseInt(bm.m.slice(5),10)+' 月最忙，共 '+fmt(bm.n)+' 則回覆。</div></div>');
+  A.push('<div class="slide"><p class="eyebrow">'+t0.getFullYear()+' / '+(t0.getMonth()+1)+' / '+t0.getDate()+' – '+t1.getFullYear()+' / '+(t1.getMonth()+1)+' / '+t1.getDate()+'</p><p class="title">謝謝你，這段時間一起努力</p><p class="end">那些沒睡的夜晚、<br>卡住又解開的瞬間、<br>一句句「再幫我改一下」，<br>都是這段路上的一部分。</p><p class="q" style="margin-top:26px">下一段，我們繼續。</p></div>');
+  return A;
+}
+
+function show(s){
+  var A=slides(s),i=0,card=$('card');
+  card.innerHTML='<div class="top"><span>AI 回憶錄 · <span id="pg"></span></span><span>'+(dropMode?'<button id="redo">重來</button> ':'')+'<button id="mask" title="快捷鍵 P">遮蔽原話</button></span></div><div id="sl"></div><div class="foot"><button id="pv" aria-label="上一張">←</button><div class="dots" id="dots"></div><button id="nx" aria-label="下一張">→</button></div>';
+  A.forEach(function(){var d=document.createElement('span');$('dots').appendChild(d)});
+  function go(n){i=(n+A.length)%A.length;$('sl').innerHTML=A[i];$('pg').textContent=(i+1)+' / '+A.length;[].forEach.call($('dots').children,function(d,k){d.className=k===i?'on':''})}
+  function tg(){var m=card.classList.toggle('masked');$('mask').textContent=m?'顯示原話':'遮蔽原話'}
+  if($('redo'))$('redo').onclick=function(){resetG();dropUI()};
+  $('pv').onclick=function(){go(i-1)};$('nx').onclick=function(){go(i+1)};$('mask').onclick=tg;
+  document.onkeydown=function(e){if(e.key==='ArrowRight'||e.key===' ')go(i+1);else if(e.key==='ArrowLeft')go(i-1);else if(e.key==='p'||e.key==='P')tg()};
+  go(0);
+}
+
+function eachLine(file,cb){
+  var r=file.stream().pipeThrough(new TextDecoderStream()).getReader(),buf='';
+  return (function pump(){return r.read().then(function(x){
+    if(x.done){if(buf)cb(buf);return}
+    buf+=x.value;var st=0,k;while((k=buf.indexOf('\n',st))>=0){cb(buf.slice(st,k));st=k+1}buf=buf.slice(st);return pump()})})();
+}
+function pathOf(f){return f.__path||f.webkitRelativePath||f.name}
+var G=newEv(),GSEEN={},dropMode=false;
+function resetG(){G=newEv();GSEEN={}}
+function addFiles(files,say){
+  var cc=[],ex=[],skipped=0,dup=0;
+  files.forEach(function(f){var n=f.name,pth=pathOf(f),key=pth+'|'+f.size;
+    var isEx=n==='conversations.json',isCc=/\.jsonl$/.test(n)&&n!=='history.jsonl'&&/projects/.test(pth.replace(/\\/g,'/'));
+    if(!isEx&&!isCc){skipped++;return}
+    if(GSEEN[key]){dup++;return}
+    GSEEN[key]=1;(isEx?ex:cc).push(f)});
+  var done=0,chain=Promise.resolve();
+  cc.forEach(function(f){chain=chain.then(function(){
+    var parts=pathOf(f).replace(/\\/g,'/').split('/'),ix=parts.indexOf('projects'),proj=ix>=0&&parts[ix+1]?parts[ix+1]:parts[Math.max(0,parts.length-2)];
+    var fl=newFile(proj,'Claude Code');
+    return eachLine(f,function(line){ccLine(line,fl,G)}).then(function(){endFile(fl,G);done++;if(done%10===0)say('已讀取 '+done+' / '+cc.length+' 個檔案…')})})});
+  ex.forEach(function(f){chain=chain.then(function(){return f.text().then(function(t){say('解析匯出檔…');parseExport(t,G)})})});
+  return chain.then(function(){return {added:cc.length+ex.length,skipped:skipped,dup:dup}});
+}
+function toolCounts(){var o={};G.sessions.forEach(function(s){o[s.tool]=(o[s.tool]||0)+1});return o}
+function finish(say){
+  var n=Object.keys(toolCounts()).length,s=summarize(G,n>1?'mixed':'single');
+  if(!s){say('還沒有可用的紀錄。請確認選的是 Claude Code 的 projects 資料夾，或匯出檔裡的 conversations.json。');return null}
+  show(s);return s;
+}
+function handleFiles(files,say){return addFiles(files,say).then(function(){return finish(say)})}
+window.__recap={summarize:summarize,handleFiles:handleFiles,addFiles:addFiles,finish:finish,resetG:resetG,toolCounts:toolCounts,show:show};
+
+
+function walk(entry,path,out){return new Promise(function(res){
+  if(entry.isFile){entry.file(function(f){f.__path=path+entry.name;out.push(f);res()},function(){res()})}
+  else if(entry.isDirectory){var rd=entry.createReader(),all=[];(function more(){rd.readEntries(function(es){
+    if(!es.length){Promise.all(all.map(function(e){return walk(e,path+entry.name+'/',out)})).then(function(){res()});return}
+    all=all.concat([].slice.call(es));more()},function(){res()})})()}
+  else res()})}
+
+function dropUI(){
+  dropMode=true;
+  $('card').innerHTML='<div class="top"><span>AI 回憶錄</span><span>全部在這個頁面內計算</span></div><div class="slide"><p class="eyebrow">第一步</p><p class="title">把你的 AI 紀錄放進來</p><div class="drop" id="dz"><p style="margin:0">把資料夾或檔案拖到這裡，可以分次加入多個 AI</p><div class="btns"><label class="btn">選擇 Claude Code 紀錄資料夾<input type="file" id="pf" webkitdirectory></label><label class="btn">選擇匯出檔 conversations.json<input type="file" id="pj" accept=".json"></label></div></div><div id="added" style="margin-top:16px"></div><div id="status"></div><div class="btns" id="acts" style="justify-content:flex-start;display:none"><button id="go">產生我的回憶錄</button><button id="clr">清除重來</button></div><p class="note">Claude Code 的資料夾：Windows 是 %USERPROFILE%\\.claude\\projects，Mac 與 Linux 是 ~/.claude/projects。ChatGPT、Claude.ai 請先在設定裡匯出資料（會寄到信箱，需要等一段時間），解壓縮後選 conversations.json。</p><p class="note">這個頁面已設定為禁止任何網路連線，你的紀錄不會被上傳，只會讀取 .jsonl 與 conversations.json 兩種檔案。</p></div>';
+  var say=function(m){$('status').textContent=m},dz=$('dz');
+  function list(){
+    var tc=toolCounts(),ks=Object.keys(tc);
+    $('added').innerHTML=ks.map(function(k){return '<div class="row"><span class="sw" style="background:var(--accent)"></span><span style="flex:1">'+esc(k)+'</span><span class="note" style="margin:0">'+tc[k]+' 段對話</span></div>'}).join('');
+    $('acts').style.display=ks.length?'flex':'none';
+  }
+  function run(fs){say('讀取中…');addFiles(fs,say).then(function(r){
+    list();
+    say(r.added?'已加入 '+r.added+' 個檔案'+(r.dup?'（略過 '+r.dup+' 個重複）':'')+'。還有其他 AI 的紀錄嗎？可以繼續加入，或直接產生。':'沒有找到可用的紀錄。請確認選的是 Claude Code 的 projects 資料夾，或匯出檔裡的 conversations.json。'+(r.dup?'（'+r.dup+' 個是重複的檔案）':''))
+  }).catch(function(e){say('讀取失敗：'+e.message)})}
+  $('pf').onchange=function(e){run([].slice.call(e.target.files));e.target.value=''};
+  $('pj').onchange=function(e){run([].slice.call(e.target.files));e.target.value=''};
+  $('go').onclick=function(){finish(say)};
+  $('clr').onclick=function(){resetG();list();say('')};
+  dz.ondragover=function(e){e.preventDefault();dz.classList.add('hot')};
+  dz.ondragleave=function(){dz.classList.remove('hot')};
+  dz.ondrop=function(e){e.preventDefault();dz.classList.remove('hot');
+    var its=[].slice.call(e.dataTransfer.items||[]).map(function(i){return i.webkitGetAsEntry&&i.webkitGetAsEntry()}).filter(Boolean),out=[];
+    if(!its.length){run([].slice.call(e.dataTransfer.files));return}
+    say('展開資料夾…');Promise.all(its.map(function(en){return walk(en,'',out)})).then(function(){run(out)})};
+  list();
+}
+
+var emb=null;try{emb=JSON.parse($('data').textContent)}catch(e){}
+if(emb)show(emb);else dropUI();
+})();
+</script>
+</body>
+</html>
